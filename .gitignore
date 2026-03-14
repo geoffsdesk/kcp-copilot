@@ -1,0 +1,28 @@
+# Build artifacts
+bin/
+tui/target/
+agent/kcp-agent
+
+# Generated protobuf
+agent/pb/*.go
+tui/src/proto/
+
+# Dependencies
+tui/Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.envrc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

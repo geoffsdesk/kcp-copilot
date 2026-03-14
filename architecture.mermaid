@@ -1,0 +1,56 @@
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#1a1a2e', 'primaryTextColor': '#e0e0e0', 'lineColor': '#5dade2', 'secondaryColor': '#16213e'}}}%%
+
+graph TB
+    subgraph TUI["<b>Rust TUI</b> (ratatui + tokio)"]
+        direction TB
+        UI["Split-Pane Terminal UI<br/>Chat | Cluster | Insights"]
+        CLAUDE_CLIENT["Claude API Client<br/><i>Tool-use agentic loop</i>"]
+        GEMINI_CLIENT["Gemini API Client<br/><i>Background analyst task</i>"]
+        GRPC_CLIENT["gRPC Client<br/><i>tonic</i>"]
+
+        UI --> CLAUDE_CLIENT
+        UI --> GEMINI_CLIENT
+        CLAUDE_CLIENT --> GRPC_CLIENT
+        GEMINI_CLIENT --> GRPC_CLIENT
+    end
+
+    subgraph AGENT["<b>Go K8s Agent</b> (client-go + gRPC)"]
+        direction TB
+        GRPC_SERVER["gRPC Server"]
+        K8S_TOOLS["K8s API Tools<br/>GetPods, GetEvents, GetLogs<br/>Scale, Rollback, Describe"]
+        GKE_TOOLS["GKE API Tools<br/>ClusterInfo, NodePools<br/>Upgrades, Security, Ops"]
+        WATCH["Event Watcher<br/><i>Server streaming</i>"]
+
+        GRPC_SERVER --> K8S_TOOLS
+        GRPC_SERVER --> GKE_TOOLS
+        GRPC_SERVER --> WATCH
+    end
+
+    subgraph APIS["<b>Google Cloud APIs</b>"]
+        K8S_API["Kubernetes API Server<br/><i>Pods, Events, Logs, Deployments</i>"]
+        GKE_API["GKE API<br/><i>container.googleapis.com</i><br/>Cluster, NodePools, Security"]
+    end
+
+    subgraph AI["<b>AI Models</b>"]
+        CLAUDE["Claude API<br/><i>Anthropic</i><br/>Interactive reasoning + tool use"]
+        GEMINI["Gemini API<br/><i>Google</i><br/>Event stream analysis"]
+    end
+
+    %% Connections
+    GRPC_CLIENT -->|"gRPC<br/>(tonic ↔ grpc-go)"| GRPC_SERVER
+    K8S_TOOLS -->|"client-go"| K8S_API
+    GKE_TOOLS -->|"cloud.google.com/go"| GKE_API
+    WATCH -->|"Watch/Informer"| K8S_API
+    CLAUDE_CLIENT -->|"HTTPS<br/>Messages API"| CLAUDE
+    GEMINI_CLIENT -->|"HTTPS<br/>GenerateContent"| GEMINI
+
+    %% Styling
+    classDef rust fill:#b7410e,stroke:#e0e0e0,color:#fff
+    classDef go fill:#00add8,stroke:#e0e0e0,color:#fff
+    classDef api fill:#4285f4,stroke:#e0e0e0,color:#fff
+    classDef ai fill:#7b2d8e,stroke:#e0e0e0,color:#fff
+
+    class UI,CLAUDE_CLIENT,GEMINI_CLIENT,GRPC_CLIENT rust
+    class GRPC_SERVER,K8S_TOOLS,GKE_TOOLS,WATCH go
+    class K8S_API,GKE_API api
+    class CLAUDE,GEMINI ai

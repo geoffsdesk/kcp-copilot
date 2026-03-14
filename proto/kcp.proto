@@ -1,0 +1,305 @@
+syntax = "proto3";
+
+package kcp;
+
+option go_package = "github.com/your-org/kcp-copilot/agent/pb";
+
+// KcpAgent exposes Kubernetes AND GKE operations as gRPC methods.
+// Each method maps 1:1 to a Claude tool definition.
+service KcpAgent {
+  // ─── Kubernetes API operations ───────────────────────────
+  rpc GetPods(GetPodsRequest) returns (GetPodsResponse);
+  rpc GetEvents(GetEventsRequest) returns (GetEventsResponse);
+  rpc GetLogs(GetLogsRequest) returns (GetLogsResponse);
+  rpc DescribeResource(DescribeResourceRequest) returns (DescribeResourceResponse);
+  rpc GetClusterOverview(GetClusterOverviewRequest) returns (GetClusterOverviewResponse);
+
+  // ─── Kubernetes API mutations ────────────────────────────
+  rpc ScaleDeployment(ScaleDeploymentRequest) returns (ScaleDeploymentResponse);
+  rpc RollbackDeployment(RollbackDeploymentRequest) returns (RollbackDeploymentResponse);
+
+  // ─── GKE Control Plane API operations ────────────────────
+  rpc GetGKEClusterInfo(GetGKEClusterInfoRequest) returns (GetGKEClusterInfoResponse);
+  rpc GetNodePools(GetNodePoolsRequest) returns (GetNodePoolsResponse);
+  rpc GetUpgradeInfo(GetUpgradeInfoRequest) returns (GetUpgradeInfoResponse);
+  rpc GetMaintenanceWindows(GetMaintenanceWindowsRequest) returns (GetMaintenanceWindowsResponse);
+  rpc GetSecurityPosture(GetSecurityPostureRequest) returns (GetSecurityPostureResponse);
+  rpc GetClusterOperations(GetClusterOperationsRequest) returns (GetClusterOperationsResponse);
+
+  // ─── Event streaming (for Gemini background analysis) ────
+  rpc WatchEvents(WatchEventsRequest) returns (stream EventInfo);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Kubernetes API Messages
+// ═══════════════════════════════════════════════════════════
+
+// ─── GetPods ───────────────────────────────────────────────
+
+message GetPodsRequest {
+  string namespace = 1;        // empty = all namespaces
+  string label_selector = 2;   // e.g. "app=redis"
+  string field_selector = 3;   // e.g. "status.phase=Failed"
+}
+
+message PodInfo {
+  string name = 1;
+  string namespace = 2;
+  string phase = 3;            // Running, Pending, Failed, etc.
+  int32 ready_containers = 4;
+  int32 total_containers = 5;
+  int32 restarts = 6;
+  string age = 7;              // human-readable, e.g. "2d3h"
+  string node = 8;
+  string status_message = 9;   // condensed reason if not Running
+}
+
+message GetPodsResponse {
+  repeated PodInfo pods = 1;
+}
+
+// ─── GetEvents ─────────────────────────────────────────────
+
+message GetEventsRequest {
+  string namespace = 1;
+  string involved_object = 2;  // e.g. "Pod/redis-master-0"
+  int32 limit = 3;             // default 20
+}
+
+message EventInfo {
+  string type = 1;             // Normal, Warning
+  string reason = 2;
+  string message = 3;
+  string involved_object = 4;  // Kind/Name
+  string first_seen = 5;
+  string last_seen = 6;
+  int32 count = 7;
+}
+
+message GetEventsResponse {
+  repeated EventInfo events = 1;
+}
+
+// ─── GetLogs ───────────────────────────────────────────────
+
+message GetLogsRequest {
+  string namespace = 1;
+  string pod = 2;
+  string container = 3;        // empty = first container
+  int32 tail_lines = 4;        // default 50
+  bool previous = 5;           // get logs from previous instance
+}
+
+message GetLogsResponse {
+  string logs = 1;
+}
+
+// ─── DescribeResource ──────────────────────────────────────
+
+message DescribeResourceRequest {
+  string kind = 1;             // Pod, Deployment, Service, Node, etc.
+  string namespace = 2;
+  string name = 3;
+}
+
+message DescribeResourceResponse {
+  string description = 1;     // kubectl describe-style output
+}
+
+// ─── GetClusterOverview ────────────────────────────────────
+
+message GetClusterOverviewRequest {}
+
+message NamespaceSummary {
+  string namespace = 1;
+  int32 total_pods = 2;
+  int32 running_pods = 3;
+  int32 failed_pods = 4;
+  int32 pending_pods = 5;
+  repeated string issues = 6;  // short descriptions of problems
+}
+
+message NodeInfo {
+  string name = 1;
+  bool ready = 2;
+  string cpu_usage = 3;        // e.g. "45%"
+  string memory_usage = 4;     // e.g. "62%"
+  string version = 5;
+}
+
+message GetClusterOverviewResponse {
+  repeated NamespaceSummary namespaces = 1;
+  repeated NodeInfo nodes = 2;
+  repeated EventInfo recent_warnings = 3;  // last 5 warning events
+}
+
+// ─── ScaleDeployment ───────────────────────────────────────
+
+message ScaleDeploymentRequest {
+  string namespace = 1;
+  string name = 2;
+  int32 replicas = 3;
+}
+
+message ScaleDeploymentResponse {
+  bool success = 1;
+  int32 previous_replicas = 2;
+  int32 new_replicas = 3;
+  string message = 4;
+}
+
+// ─── RollbackDeployment ────────────────────────────────────
+
+message RollbackDeploymentRequest {
+  string namespace = 1;
+  string name = 2;
+  int64 revision = 3;         // 0 = previous revision
+}
+
+message RollbackDeploymentResponse {
+  bool success = 1;
+  string message = 2;
+  string rolled_back_to = 3;  // revision info
+}
+
+// ─── WatchEvents (streaming for Gemini) ────────────────────
+
+message WatchEventsRequest {
+  string namespace = 1;        // empty = all namespaces
+  repeated string event_types = 2;  // "Normal", "Warning", empty = all
+}
+
+// ═══════════════════════════════════════════════════════════
+// GKE Control Plane API Messages
+// ═══════════════════════════════════════════════════════════
+
+// ─── GetGKEClusterInfo ─────────────────────────────────────
+
+message GetGKEClusterInfoRequest {}
+
+message GetGKEClusterInfoResponse {
+  string name = 1;
+  string location = 2;                // e.g. "us-central1"
+  string current_master_version = 3;  // e.g. "1.29.4-gke.1043002"
+  string current_node_version = 4;
+  string release_channel = 5;         // RAPID, REGULAR, STABLE, or UNSPECIFIED
+  string status = 6;                  // RUNNING, PROVISIONING, STOPPING, etc.
+  string network = 7;
+  string subnetwork = 8;
+  string endpoint = 9;                // control plane endpoint
+  bool autopilot_enabled = 10;
+  bool vertical_pod_autoscaling = 11;
+  string datapath_provider = 12;      // ADVANCED_DATAPATH (Dataplane V2) or LEGACY
+  string logging_service = 13;
+  string monitoring_service = 14;
+  int32 total_node_count = 15;
+  string create_time = 16;
+}
+
+// ─── GetNodePools ──────────────────────────────────────────
+
+message GetNodePoolsRequest {}
+
+message NodePoolInfo {
+  string name = 1;
+  string machine_type = 2;          // e.g. "e2-standard-4"
+  string disk_type = 3;             // e.g. "pd-standard"
+  int32 disk_size_gb = 4;
+  string image_type = 5;            // e.g. "COS_CONTAINERD"
+  int32 initial_node_count = 6;
+  int32 current_node_count = 7;
+  bool autoscaling_enabled = 8;
+  int32 autoscaling_min = 9;
+  int32 autoscaling_max = 10;
+  bool spot_instances = 11;          // using Spot VMs
+  string version = 12;
+  string status = 13;                // RUNNING, PROVISIONING, etc.
+  repeated string locations = 14;    // zones
+  int32 max_surge = 15;             // surge upgrade config
+  int32 max_unavailable = 16;
+  string upgrade_strategy = 17;      // SURGE or BLUE_GREEN
+}
+
+message GetNodePoolsResponse {
+  repeated NodePoolInfo node_pools = 1;
+}
+
+// ─── GetUpgradeInfo ────────────────────────────────────────
+
+message GetUpgradeInfoRequest {}
+
+message AvailableVersion {
+  string version = 1;
+  bool is_default = 2;
+}
+
+message GetUpgradeInfoResponse {
+  string current_version = 1;
+  repeated AvailableVersion available_master_versions = 2;
+  repeated AvailableVersion available_node_versions = 3;
+  string release_channel = 4;
+  bool auto_upgrade_enabled = 5;
+  string upgrade_status = 6;         // e.g. "UP_TO_DATE", "UPGRADE_AVAILABLE"
+  string version_skew_warning = 7;   // warning if master/node versions diverge
+}
+
+// ─── GetMaintenanceWindows ─────────────────────────────────
+
+message GetMaintenanceWindowsRequest {}
+
+message MaintenanceWindow {
+  string start_time = 1;            // RFC3339
+  string end_time = 2;
+  string recurrence = 3;            // RRULE format
+}
+
+message MaintenanceExclusion {
+  string name = 1;
+  string start_time = 2;
+  string end_time = 3;
+  string scope = 4;                  // NO_UPGRADES, NO_MINOR_UPGRADES, etc.
+}
+
+message GetMaintenanceWindowsResponse {
+  MaintenanceWindow window = 1;
+  repeated MaintenanceExclusion exclusions = 2;
+  string next_maintenance = 3;       // human-readable "next window" estimate
+}
+
+// ─── GetSecurityPosture ────────────────────────────────────
+
+message GetSecurityPostureRequest {}
+
+message GetSecurityPostureResponse {
+  bool workload_identity_enabled = 1;
+  bool binary_authorization_enabled = 2;
+  string binary_auth_eval_mode = 3;  // ALWAYS_ALLOW, REQUIRE_ATTESTATION, etc.
+  bool shielded_nodes_enabled = 4;
+  bool network_policy_enabled = 5;
+  string datapath_provider = 6;      // ADVANCED_DATAPATH = Dataplane V2
+  bool intranode_visibility = 7;
+  bool secret_encryption_enabled = 8;
+  string master_auth_mode = 9;       // describes auth method for control plane
+  repeated string security_issues = 10;  // list of flagged concerns
+}
+
+// ─── GetClusterOperations ──────────────────────────────────
+
+message GetClusterOperationsRequest {
+  bool active_only = 1;             // only show in-progress operations
+}
+
+message ClusterOperation {
+  string name = 1;
+  string operation_type = 2;        // CREATE_CLUSTER, UPGRADE_MASTER, etc.
+  string status = 3;                // RUNNING, DONE, ABORTING
+  string detail = 4;
+  string start_time = 5;
+  string end_time = 6;
+  string progress_percent = 7;
+  string target_resource = 8;       // what's being operated on
+}
+
+message GetClusterOperationsResponse {
+  repeated ClusterOperation operations = 1;
+}
