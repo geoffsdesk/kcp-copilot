@@ -152,7 +152,7 @@ make demo-cleanup
 
 ## Why This Matters
 
-**For developers**: One terminal replaces kubectl + Cloud Console + memory. Ask questions in English, get answers that combine workload state with platform state.
+**For developers**: One terminal replaces kubectl, the Cloud Console, and the mental overhead of correlating data across both. Ask questions in English, get answers that combine workload state with platform state.
 
 **For the GKE team**: Demonstrates that the GKE API surface is rich enough to power AI-driven developer tools. Every GKE-specific tool (versions, node pools, security, maintenance, operations) provides data that kubectl simply cannot access.
 
