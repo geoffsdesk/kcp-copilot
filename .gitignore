@@ -26,3 +26,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Temporary Dockerfile (Cloud Build copy of Dockerfile.agent)
+/Dockerfile

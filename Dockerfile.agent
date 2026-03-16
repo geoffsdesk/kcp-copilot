@@ -1,0 +1,52 @@
+# Multi-stage build: Proto → Go agent binary → distroless runtime
+# Build: docker build -f Dockerfile.agent -t kcp-agent .
+
+# ─── Stage 1: Proto compilation ──────────────────────────────
+FROM golang:1.24-alpine AS protoc
+RUN apk add --no-cache protobuf-dev git ca-certificates
+
+# Install Go protobuf plugins
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
+    go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+WORKDIR /workspace
+COPY proto/ proto/
+
+# Generate Go code — paths=source_relative puts .pb.go files directly in output dir
+RUN mkdir -p agent/pb && \
+    protoc -I proto \
+      --go_out=agent/pb --go_opt=paths=source_relative \
+      --go-grpc_out=agent/pb --go-grpc_opt=paths=source_relative \
+      proto/kcp.proto
+
+# ─── Stage 2: Build Go binary ────────────────────────────────
+FROM golang:1.24-alpine AS builder
+RUN apk add --no-cache ca-certificates git
+WORKDIR /workspace
+
+# Copy module files first for layer caching
+COPY agent/go.mod agent/go.sum* agent/
+WORKDIR /workspace/agent
+RUN go mod download 2>/dev/null || true
+
+# Copy source and generated proto code
+WORKDIR /workspace
+COPY agent/ agent/
+COPY --from=protoc /workspace/agent/pb/ agent/pb/
+
+# Tidy and build
+WORKDIR /workspace/agent
+RUN go mod tidy && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /tmp/kcp-agent \
+    .
+
+# ─── Stage 3: Minimal runtime ────────────────────────────────
+FROM gcr.io/distroless/static:nonroot
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /tmp/kcp-agent /app/kcp-agent
+
+EXPOSE 50051
+USER nonroot:nonroot
+ENTRYPOINT ["/app/kcp-agent"]

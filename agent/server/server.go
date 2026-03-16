@@ -16,24 +16,26 @@ import (
 
 type KcpAgentServer struct {
 	pb.UnimplementedKcpAgentServer
-	clientset   *kubernetes.Clientset
-	gkeClient   *container.ClusterManagerClient
-	clusterPath string // projects/{project}/locations/{location}/clusters/{cluster}
-	projectID   string
-	location    string
+	clientset      *kubernetes.Clientset
+	gkeClient      *container.ClusterManagerClient
+	clusterPath    string // projects/{project}/locations/{location}/clusters/{cluster}
+	projectID      string
+	location       string
+	prometheusURL  string // Prometheus or GMP frontend URL
 }
 
 func NewKcpAgentServer(
 	clientset *kubernetes.Clientset,
 	gkeClient *container.ClusterManagerClient,
-	clusterPath, projectID, location string,
+	clusterPath, projectID, location, prometheusURL string,
 ) *KcpAgentServer {
 	return &KcpAgentServer{
-		clientset:   clientset,
-		gkeClient:   gkeClient,
-		clusterPath: clusterPath,
-		projectID:   projectID,
-		location:    location,
+		clientset:     clientset,
+		gkeClient:     gkeClient,
+		clusterPath:   clusterPath,
+		projectID:     projectID,
+		location:      location,
+		prometheusURL: prometheusURL,
 	}
 }
 

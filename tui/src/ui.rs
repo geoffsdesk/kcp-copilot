@@ -270,7 +270,7 @@ fn render_gemini_insights(frame: &mut Frame, area: Rect, app: &App) {
                     Style::default().fg(color),
                 ),
                 Span::styled(
-                    &truncated,
+                    truncated,
                     Style::default().fg(color),
                 ),
                 Span::styled(

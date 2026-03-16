@@ -26,6 +26,9 @@ service KcpAgent {
   rpc GetSecurityPosture(GetSecurityPostureRequest) returns (GetSecurityPostureResponse);
   rpc GetClusterOperations(GetClusterOperationsRequest) returns (GetClusterOperationsResponse);
 
+  // ─── Monitoring API operations ──────────────────────────
+  rpc QueryMetrics(QueryMetricsRequest) returns (QueryMetricsResponse);
+
   // ─── Event streaming (for Gemini background analysis) ────
   rpc WatchEvents(WatchEventsRequest) returns (stream EventInfo);
 }
@@ -302,4 +305,30 @@ message ClusterOperation {
 
 message GetClusterOperationsResponse {
   repeated ClusterOperation operations = 1;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Monitoring API Messages
+// ═══════════════════════════════════════════════════════════
+
+// ─── QueryMetrics ──────────────────────────────────────────
+
+message QueryMetricsRequest {
+  string query = 1;           // PromQL query string
+  string time = 2;            // optional: evaluation timestamp (RFC3339), empty = now
+  string start = 3;           // optional: range query start (RFC3339)
+  string end = 4;             // optional: range query end (RFC3339)
+  string step = 5;            // optional: range query step (e.g. "30s", "1m")
+}
+
+message MetricSample {
+  map<string, string> labels = 1;
+  double value = 2;
+  string timestamp = 3;
+}
+
+message QueryMetricsResponse {
+  string result_type = 1;     // "vector", "matrix", "scalar"
+  repeated MetricSample samples = 2;
+  string raw_json = 3;        // full JSON response for complex results
 }

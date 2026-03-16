@@ -105,7 +105,7 @@ func (s *KcpAgentServer) GetNodePools(ctx context.Context, req *pb.GetNodePoolsR
 		if np.UpgradeSettings != nil {
 			info.MaxSurge = int32(np.UpgradeSettings.MaxSurge)
 			info.MaxUnavailable = int32(np.UpgradeSettings.MaxUnavailable)
-			if np.UpgradeSettings.Strategy != 0 {
+			if np.UpgradeSettings.Strategy != nil {
 				info.UpgradeStrategy = np.UpgradeSettings.Strategy.String()
 			}
 		}
@@ -206,7 +206,7 @@ func (s *KcpAgentServer) GetMaintenanceWindows(ctx context.Context, req *pb.GetM
 			dmw := w.GetDailyMaintenanceWindow()
 			resp.Window = &pb.MaintenanceWindow{
 				StartTime: dmw.StartTime,
-				EndTime:   dmw.EndTime,
+				EndTime:   dmw.Duration, // DailyMaintenanceWindow has Duration, not EndTime
 			}
 		}
 
@@ -220,12 +220,12 @@ func (s *KcpAgentServer) GetMaintenanceWindows(ctx context.Context, req *pb.GetM
 		}
 
 		for name, excl := range w.MaintenanceExclusions {
-			resp.Exclusions = append(resp.Exclusions, &pb.MaintenanceExclusion{
+			exclusion := &pb.MaintenanceExclusion{
 				Name:      name,
 				StartTime: excl.StartTime.AsTime().String(),
 				EndTime:   excl.EndTime.AsTime().String(),
-				Scope:     excl.MaintenanceExclusionOptions.GetScope().String(),
-			})
+			}
+			resp.Exclusions = append(resp.Exclusions, exclusion)
 		}
 	} else {
 		resp.NextMaintenance = "No maintenance window configured — GKE may perform maintenance at any time."

@@ -1,0 +1,117 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kcp-agent
+  namespace: sympozium-showcase
+  annotations:
+    iam.gke.io/gcp-service-account: kcp-agent@first-cascade-490202-e3.iam.gserviceaccount.com
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kcp-agent-role
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments/scale"]
+  verbs: ["get", "update", "patch"]
+- apiGroups: [""]
+  resources: ["services", "configmaps", "secrets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kcp-agent-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kcp-agent-role
+subjects:
+- kind: ServiceAccount
+  name: kcp-agent
+  namespace: sympozium-showcase
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kcp-agent
+  namespace: sympozium-showcase
+  labels:
+    app: kcp-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kcp-agent
+  template:
+    metadata:
+      labels:
+        app: kcp-agent
+    spec:
+      serviceAccountName: kcp-agent
+      containers:
+      - name: kcp-agent
+        image: us-docker.pkg.dev/first-cascade-490202-e3/sympozium/kcp-agent:latest
+        imagePullPolicy: IfNotPresent
+        args:
+        - --project=first-cascade-490202-e3
+        - --location=us-central1-a
+        - --cluster=sympozium-cluster
+        - --prometheus-url=http://frontend.default.svc:9090
+        ports:
+        - name: grpc
+          containerPort: 50051
+          protocol: TCP
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          tcpSocket:
+            port: 50051
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 50051
+          initialDelaySeconds: 10
+          periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kcp-agent
+  namespace: sympozium-showcase
+  labels:
+    app: kcp-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: kcp-agent
+  ports:
+  - name: grpc
+    port: 50051
+    targetPort: grpc
+    protocol: TCP
